@@ -68,7 +68,7 @@ uciLoadVar firewallChain bearDropper
 #
 uciLoadVar syslogTag "bearDropper[$$]"
 # how often to attempt to expire bans when in follow mode
-uciLoadVar followModeCheckInterval 30m	
+uciLoadVar followModeCheckInterval 30m
 uciLoadVar cmdLogread 'logread'		# for tuning, ex: "logread -l250"
 uciLoadVar cmdLogreadEba 'logread'	# for "Exit before auth:" backscanning
 uciLoadVar formatLogDate '%b %e %H:%M:%S %Y'	# used to convert syslog dates
@@ -415,7 +415,7 @@ exitStatus=0
 fileRegex="/tmp/bearDropper.$$.regex"
 uciLoad logRegex 's/[`$"'\\\'']//g' '/has invalid shell, rejected$/d' \
   '/^[A-Za-z ]+[0-9: ]+authpriv.warn dropbear\[.+([0-9]+\.){3}[0-9]+/p' \
-  '/^[A-Za-z ]+[0-9: ]+authpriv.info dropbear\[.+:\ Exit before auth.*/p' > "$fileRegex"
+  '/^[A-Za-z ]+[0-9: ]+authpriv.info dropbear\[.+:\ Exit before auth .*<.*>/p' > "$fileRegex"
 lastPersistentStateWrite="`date +%s`"
 loadState -f
 bddbCheckStatusAll

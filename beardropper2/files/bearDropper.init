@@ -1,0 +1,23 @@
+#!/bin/sh /etc/rc.common
+START=90
+
+PROG=/usr/sbin/bearDropper.sh
+SERVICE_DAEMONIZE=1
+SERVICE_WRITE_PID=1
+
+getKids() { 
+ egrep "^PPid:	*$1$" /proc/[0-9]*/s*s 2>/dev/null | cut -f3 -d/ | xargs echo
+}
+
+start() {
+	echo Starting bearDropper
+        service_start ${PROG} -m follow
+}
+
+stop() {
+        PID=`cat /var/run/bearDropper.sh.pid`
+	echo Stopping bearDropper $PID
+	kill `getKids $PID`
+	sleep 1
+        service_stop ${PROG}
+}

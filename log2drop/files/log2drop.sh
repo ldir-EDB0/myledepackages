@@ -428,13 +428,13 @@ if [ "$logMode" = follow ] ; then
 	logLine 1 "Running in follow mode"
 	readsSinceSave=0 lastCheckAll=0 worstCaseReads=1 tmpFile="/tmp/log2drop.$$.1"
 # Verify if these do any good - try saving to a temp.  Scope may make saveState useless.
-	trap "rm -f "$tmpFile" "$fileRegex" ; exit " SIGINT
+	trap "rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit " SIGINT
 	[ $persistentStateWritePeriod -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
 	firstRun=1
 	$cmdLogread -f | while read -t $followModeCheckInterval line || true ; do
 	  if [ $firstRun -eq 1 ] ; then
 	    trap "saveState -f" SIGHUP
-	    trap "saveState -f; exit" SIGINT
+	    trap "saveState -f; rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit" SIGINT
 	    firstRun=0
 	  fi
 	  sed -nEf "$fileRegex" > "$tmpFile" <<-_EOF_

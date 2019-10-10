@@ -226,7 +226,7 @@ getIPType () {
 unBanIP () {
 	local ip="$1"
 	local iptype=$(getIPType "$ip")
-	local ipsetname="beardropperset${iptype}"
+	local ipsetname="log2dropset${iptype}"
 
 	if ! ipset test "$ipsetname" "$ip" ; then
 	  logLine 1 "Removing ban rule for IP $ip from ipset"
@@ -240,7 +240,7 @@ unBanIP () {
 banIP () {
 	local ip="$1"
 	local iptype=$(getIPType "$ip")
-	local ipsetname="beardropperset${iptype}"
+	local ipsetname="log2dropset${iptype}"
 
 	if ! ipset test "$ipsetname" "$ip" ; then
 	  logLine 1 "Inserting IP $ip into ipset ${ipsetname}"

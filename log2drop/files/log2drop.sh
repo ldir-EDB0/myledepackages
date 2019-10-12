@@ -424,36 +424,34 @@ loadState -f
 l2dbCheckStatusAll
 
 # main event loops
-if [ "$logMode" = follow ] ; then 
-	logLine 1 "Running in follow mode"
-	readsSinceSave=0 lastCheckAll=0 worstCaseReads=1 tmpFile="/tmp/log2drop.$$.1"
+logLine 1 "Running in follow mode"
+readsSinceSave=0 lastCheckAll=0 worstCaseReads=1 tmpFile="/tmp/log2drop.$$.1"
 # Verify if these do any good - try saving to a temp.  Scope may make saveState useless.
-	trap "rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit " SIGINT
-	[ $persistentStateWritePeriod -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
-	firstRun=1
-	$cmdLogread -f | while read -t $followModeCheckInterval line || true ; do
-	  if [ $firstRun -eq 1 ] ; then
-	    trap "saveState -f" SIGHUP
-	    trap "saveState -f; rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit" SIGINT
-	    firstRun=0
-	  fi
-	  sed -nEf "$fileRegex" > "$tmpFile" <<-_EOF_
+trap "rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit " SIGINT
+[ $persistentStateWritePeriod -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
+firstRun=1
+$cmdLogread -f | while read -t $followModeCheckInterval line || true ; do
+	if [ $firstRun -eq 1 ] ; then
+		trap "saveState -f" SIGHUP
+		trap "saveState -f; rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit" SIGINT
+		firstRun=0
+	fi
+	sed -nEf "$fileRegex" > "$tmpFile" <<-_EOF_
 $line
 _EOF_
-	  line="$(cat $tmpFile)"
-	  [ -n "$line" ] && processLogLine "$line"
-	  logLine 4 "ReadComp:$readsSinceSave/$worstCaseReads"
-	  if [ $((++readsSinceSave)) -ge $worstCaseReads ] ; then
-	    now="$(date +%s)"
-	    if [ $((now - lastCheckAll)) -ge $followModeCheckInterval ] ; then
-	      l2dbCheckStatusAll
-	      lastCheckAll="$now"
-	      saveState
-	      readsSinceSave=0
-	    fi
-	  fi
-	done
-fi
+	line="$(cat $tmpFile)"
+	[ -n "$line" ] && processLogLine "$line"
+	logLine 4 "ReadComp:$readsSinceSave/$worstCaseReads"
+	if [ $((++readsSinceSave)) -ge $worstCaseReads ] ; then
+		now="$(date +%s)"
+		if [ $((now - lastCheckAll)) -ge $followModeCheckInterval ] ; then
+			l2dbCheckStatusAll
+			lastCheckAll="$now"
+			saveState
+			readsSinceSave=0
+		fi
+	fi
+done
 
 rm -f "$fileRegex"
 exit $exitStatus

@@ -122,11 +122,13 @@ l2dbGetTimes () {
 l2dbAddRecord () {
 	local iptype=$(getIPType "$1")
 	local ip="$(echo "$1" | tr .: __)" ; shift
-	local newEpochList="$@" status="$(eval echo \\\$l2db${iptype}_$ip | cut -f1 -d,)"
-	local oldEpochList="$(eval echo \\\$l2db${iptype}_$ip | cut -f2- -d,  | tr , \ )" 
-	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -un | xargs echo -n | tr \  ,)
-	[ -z "$status" ] && status=0
-	eval "l2db${iptype}_$ip"\=\"$status,$epochList\"
+#	local status="$(eval echo \\\$l2db${iptype}_$ip | cut -f1 -d,)"
+#	local newEpochList="$@"
+#	local oldEpochList="$(eval echo \\\$l2db${iptype}_$ip | cut -f2- -d,  | tr , \ )" 
+#	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -un | xargs echo -n | tr \  ,)
+#	[ -z "$status" ] && status=0
+	local epochList="$@"
+	eval "l2db${iptype}_$ip"\=\"0,$epochList\"
 	l2dbStateChange=1
 }
 

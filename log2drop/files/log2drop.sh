@@ -19,8 +19,7 @@ uciLoadVar () {
 uciLoad() {
 	local tFile=$(mktemp) delim=$'\n'
 	[ "$1" = -d ] && { delim="$2"; shift 2; }
-	uci -q -d"$delim" get "$uciSection.$1" 2>/dev/null >$tFile
-	if [ $? = 0 ] ; then
+	if uci -q -d"$delim" get "$uciSection.$1" 2>/dev/null >$tFile ; then
 	  sed -e s/^\'// -e s/\'$// <$tFile
 	else
 	  while [ -n "$2" ]; do echo $2; shift; done
@@ -73,10 +72,12 @@ l2dbCount () { set | egrep '^l2db[46]_[0-9a-fA-F_]*=' | wc -l ;}
 l2dbLoad () { 
 	local loadFile="$1.$2" fileType="$2"
 	if [ "$fileType" = l2db -a -f "$loadFile" ] ; then
+# shellcheck source=/dev/null
 	  . "$loadFile"
 	elif [ "$fileType" = l2dbz -a -f "$loadFile" ] ; then
 	  local tmpFile="$(mktemp)"
 	  zcat $loadFile > "$tmpFile"
+# shellcheck source=/dev/null
 	  . "$tmpFile"
 	  rm -f "$tmpFile"
 	fi

@@ -17,7 +17,9 @@ uciLoadVar () {
 }
 
 uciLoad() {
-	local tFile=$(mktemp) delim="$(printf '\n\r')"
+	local tFile=$(mktemp) delim="
+"
+#$(printf '\n')"
 	[ "$1" = -d ] && { delim="$2"; shift 2; }
 	uci -q -d"$delim" get "$uciSection.$1" 2>/dev/null >$tFile
 	if [ $? = 0 ] ; then

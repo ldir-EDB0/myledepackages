@@ -125,7 +125,7 @@ l2dbAddRecord () {
 	local status="$(eval echo \$l2db${iptype}_$ip | cut -f1 -d,)"
 	local newEpochList="$@"
 	local oldEpochList="$(eval echo \$l2db${iptype}_$ip | cut -f2- -d,  | tr , \ )"
-	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -un | xargs echo -n | tr \ ,)
+	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -n | xargs echo -n | tr \ ,)
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
 	[ -z "$status" ] && status="0"
 	eval "l2db${iptype}_$ip"=\"${status},${epochList}\"

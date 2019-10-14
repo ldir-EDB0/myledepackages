@@ -17,7 +17,8 @@ uciLoadVar () {
 }
 
 uciLoad() {
-	local tFile=$(mktemp) delim="$(printf '\r')"
+	local tFile=$(mktemp) delim="
+"
 	[ "$1" = -d ] && { delim="$2"; shift 2; }
 	uci -q -d"$delim" get "$uciSection.$1" 2>/dev/null >$tFile
 	if [ $? = 0 ] ; then
@@ -122,13 +123,13 @@ l2dbGetTimes () {
 l2dbAddRecord () {
 	local iptype=$(getIPType "$1")
 	local ip="$(echo "$1" | tr .: __)" ; shift
-#	local status="$(eval echo \\\$l2db${iptype}_$ip | cut -f1 -d,)"
-#	local newEpochList="$@"
-#	local oldEpochList="$(eval echo \\\$l2db${iptype}_$ip | cut -f2- -d,  | tr , \ )" 
-#	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -un | xargs echo -n | tr \  ,)
-#	[ -z "$status" ] && status=0
-	local epochList="$@"
-	eval "l2db${iptype}_$ip"\=\"0,$epochList\"
+	local status="$(eval echo \$l2db${iptype}_$ip | cut -f1 -d,)"
+	local newEpochList="$@"
+	local oldEpochList="$(eval echo \$l2db${iptype}_$ip | cut -f2- -d,  | tr , \ )"
+	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -un | xargs echo -n | tr \ ,)
+	logLine 2 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
+	[ -z "$status" ] && status="0"
+	eval "l2db${iptype}_$ip"\=\"${status},${epochList}\"
 	l2dbStateChange=1
 }
 

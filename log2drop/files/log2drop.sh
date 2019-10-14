@@ -173,7 +173,7 @@ isValidBindTime () { echo "$1" | egrep -q '^[0-9]+$|^([0-9]+[wdhms]?)+$' ; }
 expandBindTime () {
 	isValidBindTime "$1" || { logLine 0 "Error: Invalid time specified ($1)" >&2 ; exit 254 ; }
 	echo $(($(echo "$1" | sed -e 's/w+*/*7d+/g' -e 's/d+*/*24h+/g' -e 's/h+*/*60m+/g' -e 's/m+*/*60+/g' \
-	  -e s/s//g -e s/+\$//)))
+	  -e 's/s//g' -e 's/+$//')))
 }
 
 # Args: $1 = loglevel, $2 = info to log

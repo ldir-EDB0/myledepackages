@@ -6,6 +6,11 @@
 # 
 #     "follow" mode follows syslog to process entries as they happen; generally launched via init
 #        script. Responds the fastest, runs the most efficiently, but is always in memory.
+# the l2db record format
+#
+# the IP address with '.' replaced by '_' and ':' replaced by 'i' form the record key
+#
+# l2db_192_168_1_1=status,time[,time...]
 
 # Load UCI config variable, or use default if not set
 # Args: $1 = variable name (also uci option name), $2 = default_value
@@ -98,10 +103,9 @@ l2dbSave () {
 # Set l2db record status=1, update ban time flag with newest
 # Args: $1=IP Address $2=timeFlag
 l2dbEnableStatus () {
-	local record=$(echo $1 | sed -e 's/\./_/g' -e 's/:/i/g' -e 's/^/l2db_/')
+	local ipr="$(echo "$1" | tr .: _i)"
 	local newestTime=$(l2dbGetTimes "$1" | sed 's/.* //' | xargs echo $2 | tr \ '\n' | sort -un | tail -1 )
-	logLine 3 "record ${record} newestTime ${newestTime}"
-	eval "$record"=\"1,$newestTime\"
+	eval "l2db_$ipr"=\"1,$newestTime\"
 	l2dbStateChange=1
 }
 
@@ -117,21 +121,21 @@ l2dbGetTimes () {
 
 # Args: $1 = IP , $2 [$3 ...] = timestamp (seconds since epoch)
 l2dbAddRecord () {
-	local ip="$(echo "$1" | tr .: _i)" ; shift
-	local status="$(eval echo \$l2db_$ip | cut -f1 -d,)"
+	local ipr="$(echo "$1" | tr .: _i)" ; shift
+	local status="$(eval echo \$l2db_$ipr | cut -f1 -d,)"
 	local newEpochList="$@"
-	local oldEpochList="$(eval echo \$l2db_$ip | cut -f2- -d,  | tr , \ )"
+	local oldEpochList="$(eval echo \$l2db_$ipr | cut -f2- -d,  | tr , \ )"
 	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -n | xargs echo -n | tr \ ,)
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
 	[ -z "$status" ] && status="0"
-	eval "l2db_$ip"=\"${status},${epochList}\"
+	eval "l2db_$ipr"=\"${status},${epochList}\"
 	l2dbStateChange=1
 }
 
 # Args: $1 = IP address
 l2dbRemoveRecord () {
-	local ip="$(echo "$1" | tr .: _i)"
-	eval unset l2db_$ip
+	local ipr="$(echo "$1" | tr .: _i)"
+	eval unset l2db_$ipr
 	l2dbStateChange=1
 }
 

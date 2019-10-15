@@ -104,8 +104,7 @@ l2dbSave () {
 # Args: $1=IP Address $2=timeFlag
 l2dbEnableStatus () {
 	local ipr="$(echo "$1" | tr .: _i)"
-	local newestTime=$(l2dbGetTimes "$1" | sed 's/.* //' | xargs echo $2 | tr \ '\n' | sort -un | tail -1 )
-	eval "l2db_$ipr"=\"1,$newestTime\"
+	eval "l2db_$ipr"=\"1,$2\"
 	l2dbStateChange=1
 }
 

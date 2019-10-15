@@ -65,7 +65,7 @@ uciLoadVar formatTodayLogDateRegex '^%a %b %e ..:..:.. %Y'	# filter for today mo
 # Clear l2db entries from environment
 l2dbClear () { 
 	local l2dbVar
-	for l2dbVar in $(set | egrep '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset "$l2dbVar" ; done
+	for l2dbVar in $(set | egrep '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset -v "$l2dbVar" ; done
 	l2dbStateChange=1
 }
 
@@ -121,10 +121,10 @@ l2dbGetTimes () {
 # Args: $1 = IP , $2 [$3 ...] = timestamp (seconds since epoch)
 l2dbAddRecord () {
 	local ipr="$(echo "$1" | tr .: _i)" ; shift
-	local status="$(eval echo \$l2db_$ipr | cut -f1 -d,)"
+	local status="$(eval echo \"\$l2db_$ipr\" | cut -f1 -d,)"
 	local newEpochList="$@"
-	local oldEpochList="$(eval echo \$l2db_$ipr | cut -f2- -d,  | tr , \ )"
-	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -n | xargs echo -n | tr \ ,)
+	local oldEpochList="$(eval echo \"\$l2db_$ipr\" | cut -f2- -d,  | tr , \  )"
+	local epochList=$(echo "$oldEpochList" "$newEpochList" | xargs -n 1 echo | sort -n | xargs echo -n | tr \  ,)
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
 	[ -z "$status" ] && status="0"
 	eval "l2db_$ipr"=\"${status},${epochList}\"
@@ -134,21 +134,21 @@ l2dbAddRecord () {
 # Args: $1 = IP address
 l2dbRemoveRecord () {
 	local ipr="$(echo "$1" | tr .: _i)"
-	eval unset l2db_$ipr
+	eval unset -v \"l2db_$ipr\"
 	l2dbStateChange=1
 }
 
 # Returns all IPs (not CIDR) present in records
 l2dbGetAllIPs () { 
 	local ipRaw record
-	set | egrep '^l2db_[0-9_]*=' | tr \' \  | while read record ; do
-	  ipRaw=$(echo $record | cut -f1 -d= | sed 's/^l2db_//')
-	  if [ $(echo $ipRaw | tr _ \  | wc -w) -eq 4 ] ; then
+	set | egrep '^l2db_[0-9_]*=' | tr \' \  | while read -r record ; do
+	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
+	  if [ $(echo "$ipRaw" | tr _ \  | wc -w) -eq 4 ] ; then
 	    echo "$ipRaw" | tr _ .
 	  fi
 	done
-	set | egrep '^l2db_[0-9a-fA-Fi]*=' | tr \' \  | while read record ; do
-	  ipRaw=$(echo $record | cut -f1 -d= | sed 's/^l2db_//')
+	set | egrep '^l2db_[0-9a-fA-Fi]*=' | tr \' \  | while read -r record ; do
+	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
 	  echo "$ipRaw" | tr i :
 	done
 }
@@ -156,8 +156,8 @@ l2dbGetAllIPs () {
 # retrieve single IP record, Args: $1=IP
 l2dbGetRecord () {
 	local record
-	record=$(echo $1 | sed -e 's/\./_/g' -e 's/:/i/g' -e 's/^/l2db_/')
-	eval echo \$$record
+	record=$(echo "$1" | sed -e 's/\./_/g' -e 's/:/i/g' -e 's/^/l2db_/')
+	eval echo \"\$$record\"
 }
 
 isValidBindTime () { echo "$1" | egrep -q '^[0-9]+$|^([0-9]+[wdhms]?)+$' ; }
@@ -183,8 +183,7 @@ logLine () {
 getLogTime () {
 	local logDateString=$(echo "$1" | sed -n \
 	  's/^[A-Z][a-z]* \([A-Z][a-z]*  *[0-9][0-9]*  *[0-9][0-9]*:[0-9][0-9]:[0-9][0-9] [0-9][0-9]*\) .*$/\1/p')
-	date -d"$logDateString" -D"$formatLogDate" +%s || logLine 1 \
-	  "Error: logDateString($logDateString) malformed line ($1)"
+	date -d"$logDateString" -D"$formatLogDate" +%s || logLine 1 "Error: logDateString($logDateString) malformed line ($1)"
 }
 
 # extra validation, fails safe. Args: $1=log line
@@ -247,7 +246,7 @@ banIP () {
 # review state file for expired records
 l2dbCheckStatusAll () {
 	local now=$(date +%s)
-	l2dbGetAllIPs | while read ip ; do
+	l2dbGetAllIPs | while read -r ip ; do
 	  ipstatus=$(l2dbGetStatus "$ip")
 	  if [ "$ipstatus" -eq 1 ] ; then
 	    logLine 3 "l2dbCheckStatusAll($ip) testing banLength:$banLength + l2dbGetTimes:$(l2dbGetTimes $ip) vs. now:$now"
@@ -259,11 +258,11 @@ l2dbCheckStatusAll () {
 	      logLine 3 "l2dbCheckStatusAll($ip) not expired yet"
 	      banIP "$ip"
 	    fi
-	  elif [ $ipstatus -eq 0 ] ; then
-	    local times=$(l2dbGetTimes "$ip" | tr , \ )
-	    local timeCount=$(echo $times | wc -w)
-	    local lastTime=$(echo $times | cut -d\  -f$timeCount)
-	    if [ $((lastTime + attemptPeriod)) -lt $now ] ; then
+	  elif [ "$ipstatus" -eq 0 ] ; then
+	    local times=$(l2dbGetTimes "$ip" | tr , \  )
+	    local timeCount=$(echo "$times" | wc -w)
+	    local lastTime=$(echo "$times" | cut -d\  -f"$timeCount")
+	    if [ $((lastTime + attemptPeriod)) -lt "$now" ] ; then
 	      l2dbRemoveRecord "$ip"
 	  fi ; fi
 	  saveState
@@ -274,28 +273,28 @@ l2dbCheckStatusAll () {
 # Only used when status is already 0 and possibly going to 1, Args: $1=IP
 l2dbEvaluateRecord () {
 	local ip=$1 firstTime lastTime
-	local times=$(l2dbGetRecord $1 | cut -d, -f2- | tr , \ )
-	local timeCount=$(echo $times | wc -w)
+	local times=$(l2dbGetRecord "$1" | cut -d, -f2- | tr , \  )
+	local timeCount=$(echo "$times" | wc -w)
 	local didBan=0
 	
 	# 1: not enough attempts => do nothing and exit
 	# 2: attempts exceed threshold in time period => ban
 	# 3: attempts exceed threshold but time period is too long => trim oldest time, recalculate
 	while [ "$timeCount" -ge "$attemptCount" ] ; do
-	  firstTime=$(echo $times | cut -d\  -f1)
-	  lastTime=$(echo $times | cut -d\  -f$timeCount)
+	  firstTime=$(echo "$times" | cut -d\  -f1)
+	  lastTime=$(echo "$times" | cut -d\  -f"$timeCount")
 	  timeDiff=$((lastTime - firstTime))
 	  logLine 3 "l2dbEvaluateRecord($ip) count=$timeCount timeDiff=$timeDiff/$attemptPeriod"
-	  if [ $timeDiff -le $attemptPeriod ] ; then
-	    l2dbEnableStatus $ip $lastTime
+	  if [ "$timeDiff" -le "$attemptPeriod" ] ; then
+	    l2dbEnableStatus "$ip" "$lastTime"
 	    logLine 2 "l2dbEvaluateRecord($ip) exceeded ban threshold, adding to ipset"
 	    banIP "$ip"
 	    didBan=1
 	  fi
-	  times=$(echo $times | cut -d\  -f2-)
-	  timeCount=$(echo $times | wc -w)
+	  times=$(echo "$times" | cut -d\  -f2-)
+	  timeCount=$(echo "$times" | wc -w)
 	done  
-	[ $didBan = 0 ] && logLine 2 "l2dbEvaluateRecord($ip) does not exceed threshhold, skipping"
+	[ "$didBan" = 0 ] && logLine 2 "l2dbEvaluateRecord($ip) does not exceed threshhold, skipping"
 }
 
 # Reads filtered log line and evaluates for action  Args: $1=log line
@@ -307,7 +306,7 @@ processLogLine () {
 	if [ "$status" = -1 ] ; then
 	  logLine 2 "processLogLine($ip,$time) IP is whitelisted"
 	elif [ "$status" = 1 ] ; then
-	  if [ "$(l2dbGetTimes $ip)" -ge "$time" ] ; then
+	  if [ "$(l2dbGetTimes "$ip")" -ge "$time" ] ; then
 	    logLine 2 "processLogLine($ip,$time) already banned, ban timestamp already equal or newer"
 	  else
 	    logLine 2 "processLogLine($ip,$time) already banned, updating ban timestamp"
@@ -328,13 +327,13 @@ saveState () {
 	local forcePersistent=0
 	[ "$1" = "-f" ] && forcePersistent=1
 
-	if [ $l2dbStateChange -gt 0 ] ; then
+	if [ "$l2dbStateChange" -gt 0 ] ; then
 	  logLine 3 "saveState() saving to temp state file"
 	  l2dbSave "$fileStateTempPrefix" "$fileStateType"
 	  logLine 3 "saveState() now=$(date +%s) lPSW=$lastPersistentStateWrite pSWP=$persistentStateWritePeriod fP=$forcePersistent"
-	fi    
-	if [ $persistentStateWritePeriod -gt 1 ] || [ $persistentStateWritePeriod -eq 0 -a $forcePersistent -eq 1 ] ; then
-	  if [ $(($(date +%s) - lastPersistentStateWrite)) -ge $persistentStateWritePeriod ] || [ $forcePersistent -eq 1 ] ; then
+	fi
+	if [ "$persistentStateWritePeriod" -gt 1 ] || [ "$persistentStateWritePeriod" -eq 0 -a "$forcePersistent" -eq 1 ] ; then
+	  if [ $(($(date +%s) - lastPersistentStateWrite)) -ge "$persistentStateWritePeriod" ] || [ "$forcePersistent" -eq 1 ] ; then
 	    if [ ! -f "$fileStatePersist" ] || ! cmp -s "$fileStateTemp" "$fileStatePersist" ; then
 	      logLine 2 "saveState() writing to persistent state file"
 	      l2dbSave "$fileStatePersistPrefix" "$fileStateType"
@@ -380,7 +379,6 @@ printUsage () {
 
 #  Begin main logic
 #
-unset logMode
 while getopts a:b:c:f:hj:l:m:p:P:s:t: arg ; do
 	case "$arg" in 
 	  a) attemptCount="$OPTARG" ;;
@@ -396,17 +394,16 @@ while getopts a:b:c:f:hj:l:m:p:P:s:t: arg ; do
 	  *) printUsage
 	    exit 254
 	esac
-	shift $(expr $OPTIND - 1)
+	shift $((OPTIND - 1))
 done
-[ -z $logMode ] && logMode="$defaultMode"
 
 fileStateTemp="$fileStateTempPrefix.$fileStateType"
 fileStatePersist="$fileStatePersistPrefix.$fileStateType"
 
-attemptPeriod=$(expandBindTime $attemptPeriod)
-banLength=$(expandBindTime $banLength)
-[ $persistentStateWritePeriod != -1 ] && persistentStateWritePeriod=$(expandBindTime $persistentStateWritePeriod)
-followModeCheckInterval=$(expandBindTime $followModeCheckInterval)
+attemptPeriod=$(expandBindTime "$attemptPeriod")
+banLength=$(expandBindTime "$banLength")
+[ "$persistentStateWritePeriod" != -1 ] && persistentStateWritePeriod=$(expandBindTime "$persistentStateWritePeriod")
+followModeCheckInterval=$(expandBindTime "$followModeCheckInterval")
 exitStatus=0
 
 # Here we convert the logRegex list into a sed -f file
@@ -421,10 +418,10 @@ logLine 1 "Running in follow mode"
 readsSinceSave=0 lastCheckAll=0 worstCaseReads=1 tmpFile="/tmp/log2drop.$$.1"
 # Verify if these do any good - try saving to a temp.  Scope may make saveState useless.
 trap "rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit " SIGINT
-[ $persistentStateWritePeriod -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
+[ "$persistentStateWritePeriod" -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
 firstRun=1
-$cmdLogread -f | while read -t $followModeCheckInterval line || true ; do
-	if [ $firstRun -eq 1 ] ; then
+"$cmdLogread" -f | while read -r -t "$followModeCheckInterval" line || true ; do
+	if [ "$firstRun" -eq 1 ] ; then
 		trap "saveState -f" SIGHUP
 		trap "saveState -f; rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit" SIGINT
 		firstRun=0
@@ -435,9 +432,9 @@ _EOF_
 	line="$(cat $tmpFile)"
 	[ -n "$line" ] && processLogLine "$line"
 	logLine 4 "ReadComp:$readsSinceSave/$worstCaseReads"
-	if [ $((++readsSinceSave)) -ge $worstCaseReads ] ; then
+	if [ $((++readsSinceSave)) -ge "$worstCaseReads" ] ; then
 		now="$(date +%s)"
-		if [ $((now - lastCheckAll)) -ge $followModeCheckInterval ] ; then
+		if [ $((now - lastCheckAll)) -ge "$followModeCheckInterval" ] ; then
 			l2dbCheckStatusAll
 			lastCheckAll="$now"
 			saveState
@@ -447,4 +444,4 @@ _EOF_
 done
 
 rm -f "$fileRegex"
-exit $exitStatus
+exit "$exitStatus"

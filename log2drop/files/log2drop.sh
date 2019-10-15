@@ -60,12 +60,12 @@ uciLoadVar formatTodayLogDateRegex '^%a %b %e ..:..:.. %Y'	# filter for today mo
 # Clear l2db entries from environment
 l2dbClear () { 
 	local l2dbVar
-	for l2dbVar in $(set | egrep '^l2db[46]_[0-9a-fA-F_]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset "$l2dbVar" ; done
+	for l2dbVar in $(set | egrep '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset "$l2dbVar" ; done
 	l2dbStateChange=1
 }
 
 # Returns count of unique IP entries in environment
-l2dbCount () { set | egrep '^l2db[46]_[0-9a-fA-F_]*=' | wc -l ;}
+l2dbCount () { set | egrep '^l2db_[0-9a-fA-F_i]*=' | wc -l ;}
 
 # Loads existing l2db file into environment
 # Arg: $1 = file, $2 = type (l2db/l2dbz)
@@ -88,9 +88,9 @@ l2dbLoad () {
 l2dbSave () { 
 	local saveFile="$1.$2" fileType="$2"
 	if [ "$fileType" = l2db ] ; then
-	  set | egrep '^l2db[46]_[0-9a-fA-F_]*=' | sed s/\'//g > "$saveFile"
+	  set | egrep '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g > "$saveFile"
 	elif [ "$fileType" = l2dbz ] ; then
-	  set | egrep '^l2db[46]_[0-9a-fA-F_]*=' | sed s/\'//g | gzip -c > "$saveFile"
+	  set | egrep '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g | gzip -c > "$saveFile"
 	fi
 	l2dbStateChange=0 
 }
@@ -98,14 +98,10 @@ l2dbSave () {
 # Set l2db record status=1, update ban time flag with newest
 # Args: $1=IP Address $2=timeFlag
 l2dbEnableStatus () {
-	local iptype=$(getIPType "$1")
-	if [ "$iptype" = 4 ] ; then
-	  local record=$(echo $1 | sed -e 's/\./_/g' -e 's/^/l2db4_/')
-	else
-	  local record=$(echo $1 | sed -e 's/\:/_/g' -e 's/^/l2db6_/')
-	fi
-	local newestTime=$(l2dbGetTimes "$1" | sed 's/.* //' | xargs echo "$2" | tr \  '\n' | sort -n | tail -1 )
-	eval $record="1,$newestTime"
+	local record=$(echo $1 | sed -e 's/\./_/g' -e 's/:/i/g' -e 's/^/l2db_/')
+	local newestTime=$(l2dbGetTimes "$1" | sed 's/.* //' | xargs echo $2 | tr \ '\n' | sort -un | tail -1 )
+	logLine 3 "record ${record} newestTime ${newestTime}"
+	eval "$record"=\"1,$newestTime\"
 	l2dbStateChange=1
 }
 
@@ -121,50 +117,43 @@ l2dbGetTimes () {
 
 # Args: $1 = IP , $2 [$3 ...] = timestamp (seconds since epoch)
 l2dbAddRecord () {
-	local iptype=$(getIPType "$1")
-	local ip="$(echo "$1" | tr .: __)" ; shift
-	local status="$(eval echo \$l2db${iptype}_$ip | cut -f1 -d,)"
+	local ip="$(echo "$1" | tr .: _i)" ; shift
+	local status="$(eval echo \$l2db_$ip | cut -f1 -d,)"
 	local newEpochList="$@"
-	local oldEpochList="$(eval echo \$l2db${iptype}_$ip | cut -f2- -d,  | tr , \ )"
+	local oldEpochList="$(eval echo \$l2db_$ip | cut -f2- -d,  | tr , \ )"
 	local epochList=$(echo $oldEpochList $newEpochList | xargs -n 1 echo | sort -n | xargs echo -n | tr \ ,)
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
 	[ -z "$status" ] && status="0"
-	eval "l2db${iptype}_$ip"=\"${status},${epochList}\"
+	eval "l2db_$ip"=\"${status},${epochList}\"
 	l2dbStateChange=1
 }
 
 # Args: $1 = IP address
 l2dbRemoveRecord () {
-	local iptype=$(getIPType "$1")
-	local ip="$(echo "$1" | tr .: __)"
-	eval unset l2db${iptype}_$ip
+	local ip="$(echo "$1" | tr .: _i)"
+	eval unset l2db_$ip
 	l2dbStateChange=1
 }
 
 # Returns all IPs (not CIDR) present in records
 l2dbGetAllIPs () { 
 	local ipRaw record
-	set | egrep '^l2db4_[0-9_]*=' | tr \' \  | while read record ; do
-	  ipRaw=$(echo $record | cut -f1 -d= | sed 's/^l2db4_//')
+	set | egrep '^l2db_[0-9_]*=' | tr \' \  | while read record ; do
+	  ipRaw=$(echo $record | cut -f1 -d= | sed 's/^l2db_//')
 	  if [ $(echo $ipRaw | tr _ \  | wc -w) -eq 4 ] ; then
 	    echo "$ipRaw" | tr _ .
 	  fi
 	done
-	set | egrep '^l2db6_[0-9a-fA-F_]*=' | tr \' \  | while read record ; do
-	  ipRaw=$(echo $record | cut -f1 -d= | sed 's/^l2db6_//')
-	  echo "$ipRaw" | tr _ :
+	set | egrep '^l2db_[0-9a-fA-Fi]*=' | tr \' \  | while read record ; do
+	  ipRaw=$(echo $record | cut -f1 -d= | sed 's/^l2db_//')
+	  echo "$ipRaw" | tr i :
 	done
 }
 
 # retrieve single IP record, Args: $1=IP
 l2dbGetRecord () {
 	local record
-	local iptype=$(getIPType "$1")
-	if [ 4 = "$iptype" ] ; then
-	  record=$(echo $1 | sed -e 's/\./_/g' -e 's/^/l2db4_/')
-	else
-	  record=$(echo $1 | sed -e 's/\:/_/g' -e 's/^/l2db6_/')
-	fi
+	record=$(echo $1 | sed -e 's/\./_/g' -e 's/:/i/g' -e 's/^/l2db_/')
 	eval echo \$$record
 }
 
@@ -220,7 +209,7 @@ getIPType () {
 	case "$1" in
 		*:*) echo "6" ;;
 		*.*) echo "4" ;;
-		*) echo "0" ;;
+		*) echo "" ;;
 	esac
 }
 

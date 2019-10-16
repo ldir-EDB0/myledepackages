@@ -13,7 +13,7 @@ getKids() {
 
 start() {
 	echo "Starting log2drop"
-        service_start "${PROG}" -m follow
+        service_start "${PROG}"
 }
 
 stop() {

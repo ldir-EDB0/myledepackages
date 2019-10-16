@@ -10,7 +10,7 @@
 #
 # the IP address with '.' replaced by '_' and ':' replaced by 'i' form the record key
 #
-# l2db_192_168_1_1=status,time[,time...]
+# l2db_192_168_1_1=status,time[ time...]
 
 # Load UCI config variable, or use default if not set
 # Args: $1 = variable name (also uci option name), $2 = default_value
@@ -35,7 +35,6 @@ uciLoad() {
 # Common config variables - edit these in /etc/config/log2drop
 # or they can be overridden at runtime with command line options
 #
-uciLoadVar defaultMode entire
 uciLoadVar attemptCount 10
 uciLoadVar attemptPeriod 12h
 uciLoadVar banLength 1w
@@ -46,10 +45,6 @@ uciLoadVar fileStateType l2db
 uciLoadVar fileStateTempPrefix /tmp/log2drop
 uciLoadVar fileStatePersistPrefix /etc/log2drop
 
-# Not commonly changed, but changeable via uci or cmdline (primarily 
-# to enable multiple parallel runs with different parameters)
-uciLoadVar firewallChain log2drop
-
 # Advanced variables, changeable via uci only (no cmdline), it is 
 # unlikely that these will need to be changed, but just in case...
 #
@@ -58,19 +53,18 @@ uciLoadVar syslogTag "log2drop[$$]"
 uciLoadVar followModeCheckInterval 30m
 uciLoadVar cmdLogread 'logread'		# for tuning, ex: "logread -l250"
 uciLoadVar formatLogDate '%b %e %H:%M:%S %Y'	# used to convert syslog dates
-uciLoadVar formatTodayLogDateRegex '^%a %b %e ..:..:.. %Y'	# filter for today mode
 
 # Begin functions
 #
 # Clear l2db entries from environment
 l2dbClear () { 
 	local l2dbVar
-	for l2dbVar in $(set | egrep '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset -v "$l2dbVar" ; done
+	for l2dbVar in $(set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset -v "$l2dbVar" ; done
 	l2dbStateChange=1
 }
 
 # Returns count of unique IP entries in environment
-l2dbCount () { set | egrep '^l2db_[0-9a-fA-F_i]*=' | wc -l ;}
+l2dbCount () { set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | wc -l ;}
 
 # Loads existing l2db file into environment
 # Arg: $1 = file, $2 = type (l2db/l2dbz)
@@ -93,9 +87,9 @@ l2dbLoad () {
 l2dbSave () { 
 	local saveFile="$1.$2" fileType="$2"
 	if [ "$fileType" = l2db ] ; then
-	  set | egrep '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g > "$saveFile"
+	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g > "$saveFile"
 	elif [ "$fileType" = l2dbz ] ; then
-	  set | egrep '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g | gzip -c > "$saveFile"
+	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g | gzip -c > "$saveFile"
 	fi
 	l2dbStateChange=0 
 }
@@ -141,13 +135,13 @@ l2dbRemoveRecord () {
 # Returns all IPs (not CIDR) present in records
 l2dbGetAllIPs () { 
 	local ipRaw record
-	set | egrep '^l2db_[0-9_]*=' | tr "'" ' ' | while read -r record ; do
+	set | grep -E -e '^l2db_[0-9_]*=' | tr "'" ' ' | while read -r record ; do
 	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
 	  if [ $(echo "$ipRaw" | tr '_' ' ' | wc -w) -eq 4 ] ; then
 	    echo "$ipRaw" | tr '_' '.'
 	  fi
 	done
-	set | egrep '^l2db_[0-9a-fA-Fi]*=' | tr "'" ' ' | while read -r record ; do
+	set | grep -E -e '^l2db_[0-9a-fA-Fi]*=' | tr "'" ' ' | while read -r record ; do
 	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
 	  echo "$ipRaw" | tr 'i' ':'
 	done
@@ -160,11 +154,11 @@ l2dbGetRecord () {
 	eval echo \"\$$record\"
 }
 
-isValidBindTime () { echo "$1" | egrep -q '^[0-9]+$|^([0-9]+[wdhms]?)+$' ; }
+isValidBindTime () { echo "$1" | grep -E -q -e '^[0-9]+$|^([0-9]+[wdhms]?)+$' ;}
 
 # expands Bind time syntax into seconds (ex: 3w6d23h59m59s), Arg: $1=time string
 expandBindTime () {
-	isValidBindTime "$1" || { logLine 0 "Error: Invalid time specified ($1)" >&2 ; exit 254 ; }
+	isValidBindTime "$1" || { logLine 0 "Error: Invalid time specified ($1)" >&2 ; exit 254 ;}
 	echo $(($(echo "$1" | sed -e 's/w+*/*7d+/g' -e 's/d+*/*24h+/g' -e 's/h+*/*60m+/g' -e 's/m+*/*60+/g' \
 	  -e 's/s//g' -e 's/+$//')))
 }
@@ -249,7 +243,7 @@ l2dbCheckStatusAll () {
 	l2dbGetAllIPs | while read -r ip ; do
 	  ipstatus=$(l2dbGetStatus "$ip")
 	  if [ "$ipstatus" -eq 1 ] ; then
-	    logLine 3 "l2dbCheckStatusAll($ip) testing banLength:$banLength + l2dbGetTimes:$(l2dbGetTimes $ip) vs. now:$now"
+	    logLine 3 "l2dbCheckStatusAll($ip) testing banLength:$banLength + l2dbGetTimes:$(l2dbGetTimes "$ip") vs. now:$now"
 	    if [ $((banLength + $(l2dbGetTimes "$ip"))) -lt "$now" ] ; then
 	      logLine 1 "Ban expired for $ip, removing from ipset"
 	      unBanIP "$ip"
@@ -301,7 +295,7 @@ l2dbEvaluateRecord () {
 processLogLine () {
 	local time=$(getLogTime "$1")
 	local ip=$(getLogIP "$1")
-	local status="$(l2dbGetStatus $ip)"
+	local status="$(l2dbGetStatus "$ip")"
 
 	if [ "$status" = -1 ] ; then
 	  logLine 2 "processLogLine($ip,$time) IP is whitelisted"
@@ -379,15 +373,12 @@ printUsage () {
 
 #  Begin main logic
 #
-while getopts a:b:c:f:hj:l:m:p:P:s:t: arg ; do
+while getopts a:b:f:l:p:P:s:t: arg ; do
 	case "$arg" in 
 	  a) attemptCount="$OPTARG" ;;
 	  b) banLength="$OPTARG" ;;
-	  c) firewallChain="$OPTARG" ;;
 	  f) logFacility="$OPTARG" ;;
-	  j) firewallTarget="$OPTARG" ;;
 	  l) logLevel="$OPTARG" ;;
-	  m) logMode="$OPTARG" ;;
 	  p) attemptPeriod="$OPTARG" ;;
 	  P) persistentStateWritePeriod="$OPTARG" ;;
 	  s) fileStatePersistPrefix="$OPTARG" ;;
@@ -416,7 +407,6 @@ l2dbCheckStatusAll
 # main event loops
 logLine 1 "Running in follow mode"
 readsSinceSave=0 lastCheckAll=0 worstCaseReads=1 tmpFile="/tmp/log2drop.$$.1"
-# Verify if these do any good - try saving to a temp.  Scope may make saveState useless.
 trap "rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit " SIGINT
 [ "$persistentStateWritePeriod" -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
 firstRun=1
@@ -427,7 +417,7 @@ firstRun=1
 		firstRun=0
 	fi
 	sed -nEf "$fileRegex" > "$tmpFile" <<-_EOF_
-$line
+"$line"
 _EOF_
 	line="$(cat $tmpFile)"
 	[ -n "$line" ] && processLogLine "$line"

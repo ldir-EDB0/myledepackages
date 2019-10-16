@@ -103,7 +103,7 @@ l2dbSave () {
 # Set l2db record status=1, update ban time flag with newest
 # Args: $1=IP Address $2=timeFlag
 l2dbEnableStatus () {
-	local ipr="$(echo "$1" | tr .: _i)"
+	local ipr="$(echo "$1" | tr '.:' '_i')"
 	eval "l2db_$ipr"=\"1,$2\"
 	l2dbStateChange=1
 }
@@ -120,11 +120,11 @@ l2dbGetTimes () {
 
 # Args: $1 = IP , $2 [$3 ...] = timestamp (seconds since epoch)
 l2dbAddRecord () {
-	local ipr="$(echo "$1" | tr .: _i)" ; shift
+	local ipr="$(echo "$1" | tr '.:' '_i')" ; shift
 	local status="$(eval echo \"\$l2db_$ipr\" | cut -f1 -d,)"
 	local newEpochList="$@"
-	local oldEpochList="$(eval echo \"\$l2db_$ipr\" | cut -f2- -d,  | tr , \  )"
-	local epochList=$(echo "$oldEpochList" "$newEpochList" | xargs -n 1 echo | sort -n | xargs echo -n | tr \  ,)
+	local oldEpochList="$(eval echo \"\$l2db_$ipr\" | cut -f2- -d,  | tr ',' ' ')"
+	local epochList=$(echo "$oldEpochList" "$newEpochList" | xargs -n 1 echo | sort -n | xargs echo -n | tr ' ' ',')
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
 	[ -z "$status" ] && status="0"
 	eval "l2db_$ipr"=\"${status},${epochList}\"
@@ -133,7 +133,7 @@ l2dbAddRecord () {
 
 # Args: $1 = IP address
 l2dbRemoveRecord () {
-	local ipr="$(echo "$1" | tr .: _i)"
+	local ipr="$(echo "$1" | tr '.:' '_i')"
 	eval unset -v \"l2db_$ipr\"
 	l2dbStateChange=1
 }
@@ -141,15 +141,15 @@ l2dbRemoveRecord () {
 # Returns all IPs (not CIDR) present in records
 l2dbGetAllIPs () { 
 	local ipRaw record
-	set | egrep '^l2db_[0-9_]*=' | tr \' \  | while read -r record ; do
+	set | egrep '^l2db_[0-9_]*=' | tr "'" ' ' | while read -r record ; do
 	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
-	  if [ $(echo "$ipRaw" | tr _ \  | wc -w) -eq 4 ] ; then
-	    echo "$ipRaw" | tr _ .
+	  if [ $(echo "$ipRaw" | tr '_' ' ' | wc -w) -eq 4 ] ; then
+	    echo "$ipRaw" | tr '_' '.'
 	  fi
 	done
-	set | egrep '^l2db_[0-9a-fA-Fi]*=' | tr \' \  | while read -r record ; do
+	set | egrep '^l2db_[0-9a-fA-Fi]*=' | tr "'" ' ' | while read -r record ; do
 	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
-	  echo "$ipRaw" | tr i :
+	  echo "$ipRaw" | tr 'i' ':'
 	done
 }
 
@@ -259,9 +259,9 @@ l2dbCheckStatusAll () {
 	      banIP "$ip"
 	    fi
 	  elif [ "$ipstatus" -eq 0 ] ; then
-	    local times=$(l2dbGetTimes "$ip" | tr , \  )
+	    local times=$(l2dbGetTimes "$ip" | tr ',' ' ' )
 	    local timeCount=$(echo "$times" | wc -w)
-	    local lastTime=$(echo "$times" | cut -d\  -f"$timeCount")
+	    local lastTime=$(echo "$times" | cut -d' '  -f"$timeCount")
 	    if [ $((lastTime + attemptPeriod)) -lt "$now" ] ; then
 	      l2dbRemoveRecord "$ip"
 	  fi ; fi
@@ -273,7 +273,7 @@ l2dbCheckStatusAll () {
 # Only used when status is already 0 and possibly going to 1, Args: $1=IP
 l2dbEvaluateRecord () {
 	local ip=$1 firstTime lastTime
-	local times=$(l2dbGetRecord "$1" | cut -d, -f2- | tr , \  )
+	local times=$(l2dbGetRecord "$1" | cut -d, -f2- | tr ',' ' ' )
 	local timeCount=$(echo "$times" | wc -w)
 	local didBan=0
 	
@@ -281,8 +281,8 @@ l2dbEvaluateRecord () {
 	# 2: attempts exceed threshold in time period => ban
 	# 3: attempts exceed threshold but time period is too long => trim oldest time, recalculate
 	while [ "$timeCount" -ge "$attemptCount" ] ; do
-	  firstTime=$(echo "$times" | cut -d\  -f1)
-	  lastTime=$(echo "$times" | cut -d\  -f"$timeCount")
+	  firstTime=$(echo "$times" | cut -d' ' -f1)
+	  lastTime=$(echo "$times" | cut -d' ' -f"$timeCount")
 	  timeDiff=$((lastTime - firstTime))
 	  logLine 3 "l2dbEvaluateRecord($ip) count=$timeCount timeDiff=$timeDiff/$attemptPeriod"
 	  if [ "$timeDiff" -le "$attemptPeriod" ] ; then
@@ -291,7 +291,7 @@ l2dbEvaluateRecord () {
 	    banIP "$ip"
 	    didBan=1
 	  fi
-	  times=$(echo "$times" | cut -d\  -f2-)
+	  times=$(echo "$times" | cut -d' ' -f2-)
 	  timeCount=$(echo "$times" | wc -w)
 	done  
 	[ "$didBan" = 0 ] && logLine 2 "l2dbEvaluateRecord($ip) does not exceed threshold, skipping"

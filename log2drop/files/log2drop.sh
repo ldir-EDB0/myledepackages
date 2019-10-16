@@ -18,7 +18,7 @@ uciSection='log2drop.@[0]'
 uciLoadVar () { 
 	local getUci
 	getUci=$(uci -q get ${uciSection}."$1") || getUci="$2"
-	eval $1=\'$getUci\'; 
+	eval "$1=\'$getUci\'";
 }
 
 uciLoad() {
@@ -64,7 +64,7 @@ l2dbClear () {
 }
 
 # Returns count of unique IP entries in environment
-l2dbCount () { set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | wc -l ;}
+l2dbCount () { set | grep -c -E -e '^l2db_[0-9a-fA-F_i]*=' ;}
 
 # Loads existing l2db file into environment
 # Arg: $1 = file, $2 = type (l2db/l2dbz)
@@ -87,9 +87,9 @@ l2dbLoad () {
 l2dbSave () { 
 	local saveFile="$1.$2" fileType="$2"
 	if [ "$fileType" = l2db ] ; then
-	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g > "$saveFile"
+	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed -e "s/\'//g" > "$saveFile"
 	elif [ "$fileType" = l2dbz ] ; then
-	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed s/\'//g | gzip -c > "$saveFile"
+	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed -e "s/\'//g" | gzip -c > "$saveFile"
 	fi
 	l2dbStateChange=0 
 }
@@ -368,7 +368,7 @@ printUsage () {
 	  All time strings can be specified in seconds, or using BIND style
 	  time strings, ex: 1w2d3h5m30s is 1 week, 2 days, 3 hours, etc...
 
-	_EOF_
+_EOF_
 }
 
 #  Begin main logic

@@ -294,7 +294,7 @@ l2dbEvaluateRecord () {
 	  times=$(echo "$times" | cut -d\  -f2-)
 	  timeCount=$(echo "$times" | wc -w)
 	done  
-	[ "$didBan" = 0 ] && logLine 2 "l2dbEvaluateRecord($ip) does not exceed threshhold, skipping"
+	[ "$didBan" = 0 ] && logLine 2 "l2dbEvaluateRecord($ip) does not exceed threshold, skipping"
 }
 
 # Reads filtered log line and evaluates for action  Args: $1=log line

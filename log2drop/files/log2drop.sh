@@ -10,15 +10,16 @@
 #
 # the IP address with '.' replaced by '_' and ':' replaced by 'i' form the record key
 #
-# l2db_192_168_1_1=status,time[ time...]
+# l2db_192_168_1_1=status,time[,time...]
+# right most time is the most recent
 
 # Load UCI config variable, or use default if not set
 # Args: $1 = variable name (also uci option name), $2 = default_value
 uciSection='log2drop.@[0]'
 uciLoadVar () { 
 	local getUci
-	getUci=$(uci -q get ${uciSection}."$1") || getUci="$2"
-	eval "$1=\'$getUci\'";
+	getUci=$(uci -q get "${uciSection}.$1") || getUci="$2"
+	eval "$1"=\'$getUci\';
 }
 
 uciLoad() {
@@ -98,7 +99,8 @@ l2dbSave () {
 # Args: $1=IP Address $2=timeFlag
 l2dbEnableStatus () {
 	local ipr="$(echo "$1" | tr '.:' '_i')"
-	eval "l2db_$ipr"=\"1,$2\"
+	local newestTime=$(l2dbGetTimes "$1" | sed -e 's/.* //' | xargs echo $2 | tr ' ' '\n' | sort -un | tail -1 )
+	eval "l2db_$ipr"=\"1,$newestTime\"
 	l2dbStateChange=1
 }
 
@@ -116,7 +118,7 @@ l2dbGetTimes () {
 l2dbAddRecord () {
 	local ipr="$(echo "$1" | tr '.:' '_i')" ; shift
 	local status="$(eval echo \"\$l2db_$ipr\" | cut -f1 -d,)"
-	local newEpochList="$@"
+	local newEpochList="$*"
 	local oldEpochList="$(eval echo \"\$l2db_$ipr\" | cut -f2- -d,  | tr ',' ' ')"
 	local epochList=$(echo "$oldEpochList" "$newEpochList" | xargs -n 1 echo | sort -n | xargs echo -n | tr ' ' ',')
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
@@ -259,15 +261,15 @@ l2dbCheckStatusAll () {
 	    if [ $((lastTime + attemptPeriod)) -lt "$now" ] ; then
 	      l2dbRemoveRecord "$ip"
 	  fi ; fi
-	  saveState
+	  saveState "null"
 	done
 	loadState
 }
 
 # Only used when status is already 0 and possibly going to 1, Args: $1=IP
 l2dbEvaluateRecord () {
-	local ip=$1 firstTime lastTime
-	local times=$(l2dbGetRecord "$1" | cut -d, -f2- | tr ',' ' ' )
+	local ip="$1" firstTime lastTime
+	local times=$(l2dbGetRecord "$ip" | cut -d, -f2- | tr ',' ' ' )
 	local timeCount=$(echo "$times" | wc -w)
 	local didBan=0
 	
@@ -427,7 +429,7 @@ _EOF_
 		if [ $((now - lastCheckAll)) -ge "$followModeCheckInterval" ] ; then
 			l2dbCheckStatusAll
 			lastCheckAll="$now"
-			saveState
+			saveState "null"
 			readsSinceSave=0
 		fi
 	fi

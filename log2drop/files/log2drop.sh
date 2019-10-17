@@ -27,7 +27,7 @@ uciLoad() {
 	tFile=$(mktemp) delim=$'\n'
 	[ "$1" = -d ] && { delim="$2"; shift 2; }
 	if uci -q -d"$delim" get "$uciSection.$1" 2>/dev/null >"$tFile" ; then
-	  sed -e s/^\'// -e s/\'$// <"$tFile"
+	  sed -e "s/^\'//" -e "s/\'$//" "$tFile"
 	else
 	  while [ -n "$2" ]; do echo "$2"; shift; done
 	fi
@@ -51,8 +51,7 @@ uciLoadVar fileStatePersistPrefix /etc/log2drop
 # unlikely that these will need to be changed, but just in case...
 #
 uciLoadVar syslogTag "log2drop[$$]"
-# how often to attempt to expire bans when in follow mode
-uciLoadVar followModeCheckInterval 30m
+uciLoadVar followModeCheckInterval 30m	# how often to attempt to expire bans when in follow mode
 uciLoadVar cmdLogread 'logread'		# for tuning, ex: "logread -l250"
 uciLoadVar formatLogDate '%b %e %H:%M:%S %Y'	# used to convert syslog dates
 

@@ -436,16 +436,13 @@ readsSinceSave=0 lastCheckAll=0 worstCaseReads=1 tmpFile="/tmp/log2drop.$$.1"
 trap "rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit " SIGINT
 [ "$persistentStateWritePeriod" -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
 firstRun=1
-"$cmdLogread" -f | while read -r -t "$followModeCheckInterval" line || true ; do
+"$cmdLogread" -f | while read -r -t "$followModeCheckInterval" rawline || true ; do
 	if [ "$firstRun" -eq 1 ] ; then
 		trap "saveState -f" SIGHUP
 		trap "saveState -f; rm -f \"\$tmpFile\" \"\$fileRegex\" ; exit" SIGINT
 		firstRun=0
 	fi
-	sed -nEf "$fileRegex" > "$tmpFile" <<-_EOF_
-"$line"
-_EOF_
-	line="$(cat $tmpFile)"
+	line="$(echo -n "$rawline" | sed -nEf "$fileRegex")"
 	[ -n "$line" ] && processLogLine "$line"
 	logLine 4 "ReadComp:$readsSinceSave/$worstCaseReads"
 	if [ $((++readsSinceSave)) -ge "$worstCaseReads" ] ; then

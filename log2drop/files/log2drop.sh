@@ -19,7 +19,7 @@ uciSection='log2drop.@[0]'
 uciLoadVar () { 
 	local getUci
 	getUci=$(uci -q get "${uciSection}.$1") || getUci="$2"
-	eval "$1"=\'$getUci\';
+	eval "$1"=\'"$getUci"\'
 }
 
 uciLoad() {
@@ -60,7 +60,7 @@ uciLoadVar formatLogDate '%b %e %H:%M:%S %Y'	# used to convert syslog dates
 # Clear l2db entries from environment
 l2dbClear () { 
 	local l2dbVar
-	for l2dbVar in $(set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset -v "$l2dbVar" ; done
+	for l2dbVar in $(set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | cut -f1 -d= | xargs echo -n) ; do eval unset -v \'"$l2dbVar"\' ; done
 	l2dbStateChange=1
 }
 
@@ -100,7 +100,7 @@ l2dbSave () {
 l2dbEnableStatus () {
 	local ipr="$(echo "$1" | tr '.:' '_i')"
 	local newestTime=$(l2dbGetTimes "$1" | sed -e 's/.* //' | xargs echo $2 | tr ' ' '\n' | sort -un | tail -1 )
-	eval "l2db_$ipr"=\"1,$newestTime\"
+	eval "l2db_$ipr"=\'"1,$newestTime"\'
 	l2dbStateChange=1
 }
 

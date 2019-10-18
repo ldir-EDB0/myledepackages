@@ -433,13 +433,13 @@ l2dbCheckStatusAll
 # main event loops
 logLine 1 "Running in follow mode"
 readsSinceSave=0 lastCheckAll=0 worstCaseReads=1
-trap "rm -f \$fileRegex ; exit " SIGINT
+trap "rm -f \$fileRegex ; exit " SIGHUP SIGINT SIGQUIT SIGTERM
 [ "$persistentStateWritePeriod" -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
 firstRun=1
 "$cmdLogread" -f | while read -r -t "$followModeCheckInterval" rawline || true ; do
 	if [ "$firstRun" -eq 1 ] ; then
 		trap "saveState -f" SIGHUP
-		trap "saveState -f; rm -f $fileRegex ; exit" SIGINT
+		trap "saveState -f; rm -f $fileRegex ; exit" SIGINT SIGQUIT SIGTERM
 		firstRun=0
 	fi
 	line="$(echo -n "$rawline" | sed -nEf "$fileRegex")"

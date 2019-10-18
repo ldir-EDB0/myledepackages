@@ -3,16 +3,15 @@ START=90
 
 USE_PROCD=1
 
-PROG=/usr/sbin/bearDropper.sh
+PROG=/usr/sbin/log2drop.sh
 
 start_service() {
 	procd_open_instance
 	procd_set_param command ${PROG}
-	procd_append_param command -m follow
 	procd_set_param respawn
 	procd_close_instance
 }
 
 service_triggers() {
-	procd_add_reload_trigger "bearDropper"
+	procd_add_reload_trigger "log2drop"
 }

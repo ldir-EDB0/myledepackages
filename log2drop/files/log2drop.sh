@@ -72,10 +72,10 @@ l2dbCount () { set | grep -c -E -e '^l2db_[0-9a-fA-F_i]*=' ;}
 l2dbLoad () { 
 	local loadFile fileType
 	loadFile="$1.$2" fileType="$2"
-	if [ "$fileType" = l2db -a -f "$loadFile" ] ; then
+	if [ "$fileType" = 'l2db' -a -f "$loadFile" ] ; then
 # shellcheck source=/dev/null
 	  . "$loadFile"
-	elif [ "$fileType" = l2dbz -a -f "$loadFile" ] ; then
+	elif [ "$fileType" = 'l2dbz' -a -f "$loadFile" ] ; then
 	  local tmpFile
 	  tmpFile="$(mktemp)"
 	  zcat "$loadFile" > "$tmpFile"
@@ -90,7 +90,7 @@ l2dbLoad () {
 l2dbSave () { 
 	local saveFile fileType
 	saveFile="$1.$2" fileType="$2"
-	if [ "$fileType" = l2db ] ; then
+	if [ "$fileType" = 'l2db' ] ; then
 	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed -e "s/\'//g" > "$saveFile"
 	elif [ "$fileType" = l2dbz ] ; then
 	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed -e "s/\'//g" | gzip -c > "$saveFile"
@@ -124,15 +124,15 @@ l2dbAddRecord () {
 	local ipr status newEpochList oldEpochList epochList
 	ipr="${1//./_}" ; shift
 	ipr="${ipr//:/i}"
-	status="$(eval echo \"\$l2db_$ipr\" | cut -f1 -d,)"
+	status="$(eval echo \"\$l2db_"$ipr"\" | cut -f1 -d,)"
 	newEpochList="$*"
-	oldEpochList="$(eval echo \"\$l2db_$ipr\" | cut -f2- -d, )"
+	oldEpochList="$(eval echo \"\$l2db_"$ipr"\" | cut -f2- -d, )"
 	oldEpochList="${oldEpochList//,/ }"
 	epochList=$(echo "$oldEpochList" "$newEpochList" | xargs -n 1 echo | sort -n | xargs echo -n )
 	epochList="${epochList// /,}"
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
 	[ -z "$status" ] && status="0"
-	eval "l2db_$ipr"=\"${status},${epochList}\"
+	eval l2db_"$ipr"=\'"${status},${epochList}"\'
 	l2dbStateChange=1
 }
 
@@ -141,7 +141,7 @@ l2dbRemoveRecord () {
 	local ipr
 	ipr="${1//./_}"
 	ipr="${ipr//:/i}"
-	eval unset -v \"l2db_$ipr\"
+	eval unset -v \'l2db_"$ipr"\'
 	l2dbStateChange=1
 }
 
@@ -164,7 +164,7 @@ l2dbGetAllIPs () {
 l2dbGetRecord () {
 	local record
 	record=$(echo "$1" | sed -e 's/\./_/g' -e 's/:/i/g' -e 's/^/l2db_/')
-	eval echo \"\$$record\"
+	eval echo \"\$"$record"\"
 }
 
 isValidBindTime () { echo "$1" | grep -E -q -e '^[0-9]+$|^([0-9]+[wdhms]?)+$' ;}
@@ -196,15 +196,11 @@ getLogTime () {
 
 # extra validation, fails safe. Args: $1=log line
 getLogIP4 () { 
-	local logLine
-	logLine="$1"
-	echo "$logLine" | sed -En 's/^.*<(([0-9]{1,3}\.){3}([0-9]{1,3})):[0-9]{1,5}>.*/\1/p'
+	echo "$1" | sed -En 's/^.*<(([0-9]{1,3}\.){3}([0-9]{1,3})):[0-9]{1,5}>.*/\1/p'
 }
 
 getLogIP6 () {
-	local logLine
-	logLine="$1"
-	echo "$logLine" | sed -En 's/^.*<((:?[0-9a-fA-F]{1,4}:?){1,7}):[0-9]{1,5}>.*/\1/p'
+	echo "$1" | sed -En 's/^.*<((:?[0-9a-fA-F]{1,4}:?){1,7}):[0-9]{1,5}>.*/\1/p'
 }
 
 getLogIP () {
@@ -220,9 +216,9 @@ getLogIP () {
 # is address ipv4 or ipv6
 getIPType () {
 	case "$1" in
-		*:*) echo "6" ;;
-		*.*) echo "4" ;;
-		*) echo "" ;;
+		*:*) echo '6' ;;
+		*.*) echo '4' ;;
+		*) echo '' ;;
 	esac
 }
 
@@ -281,7 +277,7 @@ l2dbCheckStatusAll () {
 	    if [ $((lastTime + attemptPeriod)) -lt "$now" ] ; then
 	      l2dbRemoveRecord "$ip"
 	  fi ; fi
-	  saveState "null"
+	  saveState
 	done
 	loadState
 }
@@ -363,7 +359,7 @@ saveState () {
 
 loadState () {
 	l2dbClear
-	[ "$1" = "-f" ] && l2dbLoad "$fileStatePersistPrefix" "$fileStateType"
+	[ "$1" = '-f' ] && l2dbLoad "$fileStatePersistPrefix" "$fileStateType"
 	l2dbLoad "$fileStateTempPrefix" "$fileStateType"
 	logLine 2 "loadState() loaded $(l2dbCount) entries"
 }
@@ -431,15 +427,15 @@ loadState -f
 l2dbCheckStatusAll
 
 # main event loops
-logLine 1 "Running in follow mode"
+logLine 1 'Running in follow mode'
 readsSinceSave=0 lastCheckAll=0 worstCaseReads=1
-trap "rm -f \$fileRegex ; exit " SIGHUP SIGINT SIGQUIT SIGTERM
+trap 'rm -f fileRegex ; exit' SIGHUP SIGINT SIGQUIT SIGTERM
 [ "$persistentStateWritePeriod" -gt 1 ] && worstCaseReads=$((persistentStateWritePeriod / followModeCheckInterval))
 firstRun=1
 "$cmdLogread" -f | while read -r -t "$followModeCheckInterval" rawline || true ; do
 	if [ "$firstRun" -eq 1 ] ; then
-		trap "saveState -f" SIGHUP
-		trap "saveState -f; rm -f $fileRegex ; exit" SIGINT SIGQUIT SIGTERM
+		trap 'saveState -f' SIGHUP
+		trap 'saveState -f;rm -f $fileRegex;exit' SIGINT SIGQUIT SIGTERM
 		firstRun=0
 	fi
 	line="$(echo -n "$rawline" | sed -nEf "$fileRegex")"
@@ -450,7 +446,7 @@ firstRun=1
 		if [ $((now - lastCheckAll)) -ge "$followModeCheckInterval" ] ; then
 			l2dbCheckStatusAll
 			lastCheckAll="$now"
-			saveState "null"
+			saveState
 			readsSinceSave=0
 		fi
 	fi

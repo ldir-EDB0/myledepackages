@@ -154,13 +154,15 @@ l2dbRemoveRecord () {
 l2dbGetAllIPs () { 
 	local ipRaw record
 	set | grep -E -e '^l2db_[0-9_]*=' | tr "'" ' ' | while read -r record ; do
-	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
+	  ipRaw="${record%=*}"
+	  ipRaw="${ipRaw//l2db_/}"
 	  if [ "$(echo "${ipRaw//_/ }" | wc -w)" -eq 4 ] ; then
 	    echo "${ipRaw//_/.}"
 	  fi
 	done
 	set | grep -E -e '^l2db_[0-9a-fA-Fi]*=' | tr "'" ' ' | while read -r record ; do
-	  ipRaw=$(echo "$record" | cut -f1 -d= | sed 's/^l2db_//')
+	  ipRaw="${record%=*}"
+	  ipRaw="${ipRaw//l2db_/}"
 	  echo "${ipRaw//i/:}"
 	done
 }

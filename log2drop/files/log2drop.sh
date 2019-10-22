@@ -129,7 +129,7 @@ l2dbAddRecord () {
 	ipr="${1//./_}" ; shift
 	ipr="${ipr//:/i}"
 	record="$(eval echo \"\$l2db_"$ipr"\")"
-	status="${$record%%,*}"
+	status="${record%%,*}"
 	oldEpochList="${record#*,}"
 	oldEpochList="${oldEpochList//,/ }"
 	newEpochList="$*"

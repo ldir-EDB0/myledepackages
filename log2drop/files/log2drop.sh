@@ -91,9 +91,9 @@ l2dbSave () {
 	local saveFile fileType
 	saveFile="$1.$2" fileType="$2"
 	if [ "$fileType" = 'l2db' ] ; then
-	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed -e "s/\'//g" > "$saveFile"
+	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' > "$saveFile"
 	elif [ "$fileType" = l2dbz ] ; then
-	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | sed -e "s/\'//g" | gzip -c > "$saveFile"
+	  set | grep -E -e '^l2db_[0-9a-fA-F_i]*=' | gzip -c > "$saveFile"
 	fi
 	l2dbStateChange=0 
 }
@@ -111,23 +111,28 @@ l2dbEnableStatus () {
 
 # Args: $1=IP Address
 l2dbGetStatus () {
-	l2dbGetRecord "$1" | cut -d, -f1
+	local record
+	record="$(l2dbGetRecord "$1")"
+	echo "${record%%,*}"
 }
 
 # Args: $1=IP Address
 l2dbGetTimes () {
-	l2dbGetRecord "$1" | cut -d, -f2-
+	local record
+	record="$(l2dbGetRecord "$1")"
+	echo "${record#*,}"
 }
 
 # Args: $1 = IP , $2 [$3 ...] = timestamp (seconds since epoch)
 l2dbAddRecord () {
-	local ipr status newEpochList oldEpochList epochList
+	local ipr status record newEpochList oldEpochList epochList
 	ipr="${1//./_}" ; shift
 	ipr="${ipr//:/i}"
-	status="$(eval echo \"\$l2db_"$ipr"\" | cut -f1 -d,)"
-	newEpochList="$*"
-	oldEpochList="$(eval echo \"\$l2db_"$ipr"\" | cut -f2- -d, )"
+	record="$(eval echo \"\$l2db_"$ipr"\")"
+	status="${$record%%,*}"
+	oldEpochList="${record#*,}"
 	oldEpochList="${oldEpochList//,/ }"
+	newEpochList="$*"
 	epochList=$(echo "$oldEpochList" "$newEpochList" | xargs -n 1 echo | sort -n | xargs echo -n )
 	epochList="${epochList// /,}"
 	logLine 3 "newEpochlist ${newEpochList} oldEpochList ${oldEpochList} epochlist ${epochList}"
@@ -172,8 +177,8 @@ isValidBindTime () { echo "$1" | grep -E -q -e '^[0-9]+$|^([0-9]+[wdhms]?)+$' ;}
 # expands Bind time syntax into seconds (ex: 3w6d23h59m59s), Arg: $1=time string
 expandBindTime () {
 	isValidBindTime "$1" || { logLine 0 "Error: Invalid time specified ($1)" >&2 ; exit 254 ;}
-	echo $(($(echo "$1" | sed -e 's/w+*/*7d+/g' -e 's/d+*/*24h+/g' -e 's/h+*/*60m+/g' -e 's/m+*/*60+/g' \
-	  -e 's/s//g' -e 's/+$//')))
+	echo $(($(echo "$1" | \
+		sed -e 's/w+*/*7d+/g' -e 's/d+*/*24h+/g' -e 's/h+*/*60m+/g' -e 's/m+*/*60+/g' -e 's/s//g' -e 's/+$//')))
 }
 
 # Args: $1 = loglevel, $2 = info to log
@@ -189,8 +194,8 @@ logLine () {
 # extra validation, fails safe. Args: $1=log line
 getLogTime () {
 	local logDateString
-	logDateString=$(echo "$1" | sed -n \
-	  's/^[A-Z][a-z]* \([A-Z][a-z]*  *[0-9][0-9]*  *[0-9][0-9]*:[0-9][0-9]:[0-9][0-9] [0-9][0-9]*\) .*$/\1/p')
+	logDateString="$(echo "$1" | \
+		sed -n 's/^[A-Z][a-z]* \([A-Z][a-z]*  *[0-9][0-9]*  *[0-9][0-9]*:[0-9][0-9]:[0-9][0-9] [0-9][0-9]*\) .*$/\1/p')"
 	date -d"$logDateString" -D"$formatLogDate" +%s || logLine 1 "Error: logDateString($logDateString) malformed line ($1)"
 }
 

@@ -293,9 +293,10 @@ l2dbCheckStatusAll () {
 l2dbEvaluateRecord () {
 	local ip firstTime lastTime times timeCount didBan
 	ip="$1"
-	times=$(l2dbGetRecord "$ip" | cut -d, -f2- )
+	times="$(l2dbGetRecord "$ip")"
+	times="${times#*,}"
 	times="${times//,/ }"
-	timeCount=$(echo "$times" | wc -w)
+	timeCount="$(echo "$times" | wc -w)"
 	didBan=0
 	
 	# 1: not enough attempts => do nothing and exit

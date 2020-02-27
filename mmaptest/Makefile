@@ -15,6 +15,7 @@ define KernelPackage/mmaptest
   FILES:=\
      $(PKG_BUILD_DIR)/mmaptest.ko
   AUTOLOAD:=$(call AutoProbe,mmaptest)
+  DEPENDS:=@BROKEN
 endef
 
 define Build/Compile

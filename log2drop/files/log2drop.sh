@@ -296,15 +296,16 @@ l2dbEvaluateRecord () {
 	times="$(l2dbGetRecord "$ip")"
 	times="${times#*,}"
 	times="${times//,/ }"
-	timeCount="$(echo "$times" | wc -w)"
 	didBan=0
+
+	timeCount="$(echo "$times" | wc -w)"
+	firstTime="${times%% *}"
 	
 	# 1: not enough attempts => do nothing and exit
 	# 2: attempts exceed threshold in time period => ban
 	# 3: attempts exceed threshold but time period is too long => trim oldest time, recalculate
 	while [ "$timeCount" -ge "$attemptCount" ] ; do
-	  firstTime=$(echo "$times" | cut -d' ' -f1)
-	  lastTime=$(echo "$times" | cut -d' ' -f"$timeCount")
+	  lastTime="${times##* }"
 	  timeDiff=$((lastTime - firstTime))
 	  logLine 3 "l2dbEvaluateRecord($ip) count=$timeCount timeDiff=$timeDiff/$attemptPeriod"
 	  if [ "$timeDiff" -le "$attemptPeriod" ] ; then
@@ -313,8 +314,8 @@ l2dbEvaluateRecord () {
 	    banIP "$ip"
 	    didBan=1
 	  fi
-	  times=$(echo "$times" | cut -d' ' -f2-)
-	  timeCount=$(echo "$times" | wc -w)
+	  times=${times#* }
+	  timeCount=$((timeCount-1))
 	done  
 	[ "$didBan" = 0 ] && logLine 2 "l2dbEvaluateRecord($ip) does not exceed threshold, skipping"
 }

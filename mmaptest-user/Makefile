@@ -11,6 +11,7 @@ include $(INCLUDE_DIR)/package.mk
 define Package/mmaptest-user
   CATEGORY:=Extra
   TITLE:=mmaptest-user
+  DEPENDS:=@BROKEN
 endef
 
 define Build/Compile
